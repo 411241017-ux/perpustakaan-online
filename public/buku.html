@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Buku - Perpustakaan Online</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>📚 PerpusApp</h2>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">🏠 Dashboard</a></li>
+            <li><a href="buku.html" class="active">📖 Kelola Buku</a></li>
+            <li><a href="peminjam.html">👥 Kelola Peminjam</a></li>
+            <li><a href="transaksi.html">🔄 Transaksi</a></li>
+        </ul>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Kelola Buku</h1>
+                <p>Manajemen data buku perpustakaan.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal()">+ Tambah Buku</button>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Sampul</th>
+                        <th>Judul</th>
+                        <th>Pengarang</th>
+                        <th>Penerbit</th>
+                        <th>Tahun</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="bukuTableBody">
+                    <!-- Data will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Form -->
+    <div id="bukuModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle" style="margin-bottom: 24px;">Tambah Buku</h2>
+            <form id="bukuForm" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="bukuId">
+                
+                <div class="form-group">
+                    <label>Judul Buku</label>
+                    <input type="text" id="judul" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Pengarang</label>
+                    <input type="text" id="pengarang" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Penerbit</label>
+                    <input type="text" id="penerbit" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Tahun Terbit</label>
+                    <input type="number" id="tahun_terbit" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Gambar Sampul</label>
+                    <input type="file" id="gambar_sampul" class="form-control" accept="image/*">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 16px;">Simpan Data</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', loadDataBuku);
+
+        async function loadDataBuku() {
+            try {
+                const response = await fetch('/api/buku');
+                const data = await response.json();
+                
+                const tableBody = document.getElementById('bukuTableBody');
+                tableBody.innerHTML = '';
+                
+                data.forEach(buku => {
+                    const statusBadge = buku.status === 'Tersedia' 
+                        ? '<span class="badge badge-success">Tersedia</span>'
+                        : '<span class="badge badge-warning">Dipinjam</span>';
+                    
+                    const imageUrl = buku.gambar_sampul ? `/uploads/${buku.gambar_sampul}` : 'https://via.placeholder.com/60x80?text=No+Img';
+
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td><img src="${imageUrl}" class="image-preview" alt="Sampul"></td>
+                            <td><strong>${buku.judul}</strong></td>
+                            <td>${buku.pengarang}</td>
+                            <td>${buku.penerbit}</td>
+                            <td>${buku.tahun_terbit}</td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="btn btn-secondary btn-sm" onclick='editBuku(${JSON.stringify(buku)})'>Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick='hapusBuku(${buku.id})'>Hapus</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        function openModal() {
+            document.getElementById('bukuForm').reset();
+            document.getElementById('bukuId').value = '';
+            document.getElementById('modalTitle').innerText = 'Tambah Buku';
+            document.getElementById('bukuModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('bukuModal').classList.remove('show');
+        }
+
+        function editBuku(buku) {
+            document.getElementById('bukuId').value = buku.id;
+            document.getElementById('judul').value = buku.judul;
+            document.getElementById('pengarang').value = buku.pengarang;
+            document.getElementById('penerbit').value = buku.penerbit;
+            document.getElementById('tahun_terbit').value = buku.tahun_terbit;
+            document.getElementById('modalTitle').innerText = 'Edit Buku';
+            document.getElementById('bukuModal').classList.add('show');
+        }
+
+        async function hapusBuku(id) {
+            if (confirm('Yakin ingin menghapus buku ini?')) {
+                try {
+                    await fetch(`/api/buku/${id}`, { method: 'DELETE' });
+                    alert('Buku berhasil dihapus');
+                    loadDataBuku();
+                } catch (error) {
+                    console.error('Error deleting data:', error);
+                }
+            }
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('bukuId').value;
+            const formData = new FormData();
+            
+            formData.append('judul', document.getElementById('judul').value);
+            formData.append('pengarang', document.getElementById('pengarang').value);
+            formData.append('penerbit', document.getElementById('penerbit').value);
+            formData.append('tahun_terbit', document.getElementById('tahun_terbit').value);
+            
+            const fileInput = document.getElementById('gambar_sampul');
+            if (fileInput.files.length > 0) {
+                formData.append('gambar_sampul', fileInput.files[0]);
+            }
+
+            try {
+                let url = '/api/buku';
+                let method = 'POST';
+
+                if (id) {
+                    url += `/${id}`;
+                    method = 'PUT';
+                }
+
+                await fetch(url, {
+                    method: method,
+                    body: formData
+                });
+
+                alert(id ? 'Data berhasil diperbarui' : 'Data berhasil ditambahkan');
+                closeModal();
+                loadDataBuku();
+            } catch (error) {
+                console.error('Error saving data:', error);
+                alert('Terjadi kesalahan');
+            }
+        }
+    </script>
+</body>
+</html>

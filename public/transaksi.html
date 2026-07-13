@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaksi - Perpustakaan Online</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>📚 PerpusApp</h2>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">🏠 Dashboard</a></li>
+            <li><a href="buku.html">📖 Kelola Buku</a></li>
+            <li><a href="peminjam.html">👥 Kelola Peminjam</a></li>
+            <li><a href="transaksi.html" class="active">🔄 Transaksi</a></li>
+        </ul>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Transaksi</h1>
+                <p>Peminjaman dan Pengembalian Buku.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal()">+ Peminjaman Baru</button>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Buku</th>
+                        <th>Peminjam</th>
+                        <th>Tgl Pinjam</th>
+                        <th>Tgl Kembali</th>
+                        <th>Status</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="transaksiTableBody">
+                    <!-- Data will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Form Peminjaman -->
+    <div id="transaksiModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 style="margin-bottom: 24px;">Peminjaman Buku</h2>
+            <form id="transaksiForm" onsubmit="handleFormSubmit(event)">
+                
+                <div class="form-group">
+                    <label>Pilih Buku</label>
+                    <select id="id_buku" class="form-control" required>
+                        <!-- Options will be populated via JS -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Pilih Peminjam</label>
+                    <select id="id_peminjam" class="form-control" required>
+                        <!-- Options will be populated via JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Tanggal Pinjam</label>
+                    <input type="date" id="tanggal_pinjam" class="form-control" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 16px;">Catat Peminjaman</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Form Pengembalian -->
+    <div id="kembaliModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeKembaliModal()">&times;</span>
+            <h2 style="margin-bottom: 24px;">Pengembalian Buku</h2>
+            <form id="kembaliForm" onsubmit="handleKembaliSubmit(event)">
+                <input type="hidden" id="kembali_id_transaksi">
+                
+                <div class="form-group">
+                    <label>Tanggal Kembali</label>
+                    <input type="date" id="tanggal_kembali" class="form-control" required>
+                </div>
+
+                <button type="submit" class="btn btn-secondary" style="width: 100%; margin-top: 16px;">Catat Pengembalian</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDataTransaksi();
+            
+            // Set today's date as default
+            document.getElementById('tanggal_pinjam').valueAsDate = new Date();
+            document.getElementById('tanggal_kembali').valueAsDate = new Date();
+        });
+
+        async function loadDataTransaksi() {
+            try {
+                const response = await fetch('/api/transaksi');
+                const data = await response.json();
+                
+                const tableBody = document.getElementById('transaksiTableBody');
+                tableBody.innerHTML = '';
+                
+                data.forEach(t => {
+                    const statusBadge = t.status === 'Dipinjam' 
+                        ? '<span class="badge badge-warning">Dipinjam</span>'
+                        : '<span class="badge badge-success">Dikembalikan</span>';
+                    
+                    const tglPinjam = new Date(t.tanggal_pinjam).toLocaleDateString('id-ID');
+                    const tglKembali = t.tanggal_kembali ? new Date(t.tanggal_kembali).toLocaleDateString('id-ID') : '-';
+                    
+                    let actionButtons = '';
+                    if (t.status === 'Dipinjam') {
+                        actionButtons = `<button class="btn btn-secondary btn-sm" onclick="openKembaliModal(${t.id})">Kembalikan</button>`;
+                    }
+                    actionButtons += `<button class="btn btn-danger btn-sm" onclick="hapusTransaksi(${t.id})" style="margin-left:8px;">Hapus</button>`;
+
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td>#${t.id}</td>
+                            <td><strong>${t.buku_judul}</strong></td>
+                            <td>${t.peminjam_nama}</td>
+                            <td>${tglPinjam}</td>
+                            <td>${tglKembali}</td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <div style="display:flex;">
+                                    ${actionButtons}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        async function populateSelects() {
+            try {
+                const [bukuRes, peminjamRes] = await Promise.all([
+                    fetch('/api/buku'),
+                    fetch('/api/peminjam')
+                ]);
+                
+                const bukuData = await bukuRes.json();
+                const peminjamData = await peminjamRes.json();
+                
+                const selectBuku = document.getElementById('id_buku');
+                selectBuku.innerHTML = '<option value="">-- Pilih Buku --</option>';
+                bukuData.forEach(b => {
+                    if(b.status === 'Tersedia') {
+                        selectBuku.innerHTML += `<option value="${b.id}">${b.judul} (${b.pengarang})</option>`;
+                    }
+                });
+
+                const selectPeminjam = document.getElementById('id_peminjam');
+                selectPeminjam.innerHTML = '<option value="">-- Pilih Peminjam --</option>';
+                peminjamData.forEach(p => {
+                    selectPeminjam.innerHTML += `<option value="${p.id}">${p.nim} - ${p.nama}</option>`;
+                });
+                
+            } catch (error) {
+                console.error('Error populating selects', error);
+            }
+        }
+
+        function openModal() {
+            populateSelects();
+            document.getElementById('transaksiForm').reset();
+            document.getElementById('tanggal_pinjam').valueAsDate = new Date();
+            document.getElementById('transaksiModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('transaksiModal').classList.remove('show');
+        }
+
+        function openKembaliModal(id) {
+            document.getElementById('kembali_id_transaksi').value = id;
+            document.getElementById('tanggal_kembali').valueAsDate = new Date();
+            document.getElementById('kembaliModal').classList.add('show');
+        }
+
+        function closeKembaliModal() {
+            document.getElementById('kembaliModal').classList.remove('show');
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const data = {
+                id_buku: document.getElementById('id_buku').value,
+                id_peminjam: document.getElementById('id_peminjam').value,
+                tanggal_pinjam: document.getElementById('tanggal_pinjam').value
+            };
+
+            try {
+                const response = await fetch('/api/transaksi/pinjam', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if(!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message);
+                }
+
+                alert('Peminjaman berhasil dicatat');
+                closeModal();
+                loadDataTransaksi();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
+        }
+
+        async function handleKembaliSubmit(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('kembali_id_transaksi').value;
+            const data = {
+                tanggal_kembali: document.getElementById('tanggal_kembali').value
+            };
+
+            try {
+                const response = await fetch(`/api/transaksi/kembali/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if(!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message);
+                }
+
+                alert('Pengembalian berhasil dicatat');
+                closeKembaliModal();
+                loadDataTransaksi();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan: ' + error.message);
+            }
+        }
+
+        async function hapusTransaksi(id) {
+            if (confirm('Yakin ingin menghapus riwayat transaksi ini?')) {
+                try {
+                    await fetch(`/api/transaksi/${id}`, { method: 'DELETE' });
+                    alert('Data transaksi berhasil dihapus');
+                    loadDataTransaksi();
+                } catch (error) {
+                    console.error('Error deleting data:', error);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

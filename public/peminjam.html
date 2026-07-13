@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelola Peminjam - Perpustakaan Online</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>📚 PerpusApp</h2>
+        </div>
+        <ul class="nav-links">
+            <li><a href="index.html">🏠 Dashboard</a></li>
+            <li><a href="buku.html">📖 Kelola Buku</a></li>
+            <li><a href="peminjam.html" class="active">👥 Kelola Peminjam</a></li>
+            <li><a href="transaksi.html">🔄 Transaksi</a></li>
+        </ul>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Kelola Peminjam</h1>
+                <p>Manajemen data anggota perpustakaan.</p>
+            </div>
+            <button class="btn btn-primary" onclick="openModal()">+ Tambah Peminjam</button>
+        </header>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>NIM/ID</th>
+                        <th>Nama</th>
+                        <th>Jurusan</th>
+                        <th>No Telepon</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="peminjamTableBody">
+                    <!-- Data will be loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <!-- Modal Form -->
+    <div id="peminjamModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle" style="margin-bottom: 24px;">Tambah Peminjam</h2>
+            <form id="peminjamForm" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="peminjamId">
+                
+                <div class="form-group">
+                    <label>NIM</label>
+                    <input type="text" id="nim" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Nama Lengkap</label>
+                    <input type="text" id="nama" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Jurusan</label>
+                    <input type="text" id="jurusan" class="form-control" required>
+                </div>
+
+                <div class="form-group">
+                    <label>No Telepon</label>
+                    <input type="text" id="no_telp" class="form-control">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 16px;">Simpan Data</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="js/script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', loadDataPeminjam);
+
+        async function loadDataPeminjam() {
+            try {
+                const response = await fetch('/api/peminjam');
+                const data = await response.json();
+                
+                const tableBody = document.getElementById('peminjamTableBody');
+                tableBody.innerHTML = '';
+                
+                data.forEach(p => {
+                    tableBody.innerHTML += `
+                        <tr>
+                            <td><strong>${p.nim}</strong></td>
+                            <td>${p.nama}</td>
+                            <td>${p.jurusan}</td>
+                            <td>${p.no_telp || '-'}</td>
+                            <td>
+                                <div style="display:flex; gap:8px;">
+                                    <button class="btn btn-secondary btn-sm" onclick='editPeminjam(${JSON.stringify(p)})'>Edit</button>
+                                    <button class="btn btn-danger btn-sm" onclick='hapusPeminjam(${p.id})'>Hapus</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        function openModal() {
+            document.getElementById('peminjamForm').reset();
+            document.getElementById('peminjamId').value = '';
+            document.getElementById('modalTitle').innerText = 'Tambah Peminjam';
+            document.getElementById('peminjamModal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('peminjamModal').classList.remove('show');
+        }
+
+        function editPeminjam(p) {
+            document.getElementById('peminjamId').value = p.id;
+            document.getElementById('nim').value = p.nim;
+            document.getElementById('nama').value = p.nama;
+            document.getElementById('jurusan').value = p.jurusan;
+            document.getElementById('no_telp').value = p.no_telp;
+            document.getElementById('modalTitle').innerText = 'Edit Peminjam';
+            document.getElementById('peminjamModal').classList.add('show');
+        }
+
+        async function hapusPeminjam(id) {
+            if (confirm('Yakin ingin menghapus data peminjam ini?')) {
+                try {
+                    await fetch(`/api/peminjam/${id}`, { method: 'DELETE' });
+                    alert('Data peminjam berhasil dihapus');
+                    loadDataPeminjam();
+                } catch (error) {
+                    console.error('Error deleting data:', error);
+                }
+            }
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const id = document.getElementById('peminjamId').value;
+            const data = {
+                nim: document.getElementById('nim').value,
+                nama: document.getElementById('nama').value,
+                jurusan: document.getElementById('jurusan').value,
+                no_telp: document.getElementById('no_telp').value
+            };
+
+            try {
+                let url = '/api/peminjam';
+                let method = 'POST';
+
+                if (id) {
+                    url += `/${id}`;
+                    method = 'PUT';
+                }
+
+                await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                alert(id ? 'Data berhasil diperbarui' : 'Data berhasil ditambahkan');
+                closeModal();
+                loadDataPeminjam();
+            } catch (error) {
+                console.error('Error saving data:', error);
+                alert('Terjadi kesalahan');
+            }
+        }
+    </script>
+</body>
+</html>
